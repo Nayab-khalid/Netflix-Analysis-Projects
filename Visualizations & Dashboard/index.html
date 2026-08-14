@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Netflix Content Analytics Dashboard — Interactive D3.js visualization system exploring 8,800+ Netflix titles across genres, countries, ratings, and time periods.">
+    <title>Netflix Content Analytics Dashboard</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Dashboard Styles -->
+    <link rel="stylesheet" href="css/dashboard.css">
+    
+    <!-- Theme Toggle Logic (Inline to prevent flash) -->
+    <script>
+        const savedTheme = localStorage.getItem('netflix-theme') || 'dark';
+        if (savedTheme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        }
+    </script>
+</head>
+<body>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         UPLOAD OVERLAY
+         ═══════════════════════════════════════════════════════════════ -->
+    <div id="upload-overlay" class="upload-overlay">
+        <div class="upload-content">
+            <img src="assets/logo.png" class="upload-logo" style="width: 160px; height: auto;" alt="Logo" aria-hidden="true">
+            <h2>Content Analytics Dashboard</h2>
+            <p>Please upload your Netflix dataset (.csv) to begin.</p>
+            <label for="dataset-upload" class="upload-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                Upload Dataset
+            </label>
+            <input type="file" id="dataset-upload" accept=".csv" style="display: none;">
+            <p id="upload-error" class="upload-error" style="display: none;"></p>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         TOP HEADER BAR
+         ═══════════════════════════════════════════════════════════════ -->
+    <header class="top-header" id="main-header" style="display: none;">
+        <div class="top-header__brand">
+            <img src="assets/logo.png" class="top-header__logo" style="width: 80px; height: auto;" alt="Logo" aria-hidden="true">
+            <h1 class="top-header__title">Content Analytics</h1>
+        </div>
+        <div class="top-header__stats">
+            <div class="top-header__stat">
+                <span>Total Titles</span>
+                <span class="top-header__stat-value" id="stat-total">—</span>
+            </div>
+            <div class="top-header__stat">
+                <span>Movies</span>
+                <span class="top-header__stat-value" id="stat-movies">—</span>
+            </div>
+            <div class="top-header__stat">
+                <span>TV Shows</span>
+                <span class="top-header__stat-value" id="stat-shows">—</span>
+            </div>
+            <div class="top-header__stat">
+                <span>Countries</span>
+                <span class="top-header__stat-value" id="stat-countries">—</span>
+            </div>
+            <button id="theme-toggle" class="theme-toggle" aria-label="Toggle Theme">
+                <svg id="theme-icon-sun" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                <svg id="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MAIN DASHBOARD LAYOUT
+         ═══════════════════════════════════════════════════════════════ -->
+    <div class="dashboard" id="main-dashboard" style="display: none;">
+
+        <!-- ─── SIDEBAR ─────────────────────────────────────────────── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar__section">
+                <h3 class="sidebar__heading">Filters</h3>
+
+                <!-- Year Range -->
+                <div class="filter-group">
+                    <label class="filter-label">Year Range</label>
+                    <span class="filter-value" id="year-range-label">2008 — 2021</span>
+                    <div id="year-filter-container" style="width: 100%; height: 50px; position: relative;">
+                        <!-- D3 Mini-Histogram Brush will render here -->
+                    </div>
+                </div>
+
+                <!-- Content Type -->
+                <div class="filter-group">
+                    <label class="filter-label">Content Type</label>
+                    <div class="type-toggle">
+                        <button class="type-btn active" data-type="All">All</button>
+                        <button class="type-btn type-btn--movie" data-type="Movie">Movies</button>
+                        <button class="type-btn type-btn--show" data-type="TV Show">TV Shows</button>
+                    </div>
+                </div>
+
+                <!-- Country -->
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-country">Country</label>
+                    <select id="filter-country" class="filter-select">
+                        <option value="All">All Countries</option>
+                    </select>
+                </div>
+
+                <!-- Rating -->
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-rating">Rating</label>
+                    <select id="filter-rating" class="filter-select">
+                        <option value="All">All Ratings</option>
+                    </select>
+                </div>
+
+                <!-- Genre -->
+                <div class="filter-group">
+                    <label class="filter-label" for="filter-genre">Genre</label>
+                    <select id="filter-genre" class="filter-select">
+                        <option value="All">All Genres</option>
+                    </select>
+                </div>
+
+                <!-- Reset -->
+                <button class="btn-reset" id="btn-reset">
+                    <span>↻</span> Reset All Filters
+                </button>
+            </div>
+
+        </aside>
+
+        <!-- ─── MAIN CHART GRID ─────────────────────────────────────── -->
+        <main class="main-content">
+
+            <!-- Row 1: Full-width Timeline -->
+            <div class="chart-card chart-card--full" id="card-timeline">
+                <div class="chart-card__header">
+                    <h2 class="chart-card__title">Content Growth Timeline</h2>
+                </div>
+                <div class="chart-container" id="chart-timeline"></div>
+            </div>
+
+            <!-- Row 2: Map + Treemap -->
+            <div class="chart-card" id="card-map">
+                <div class="chart-card__header">
+                    <h2 class="chart-card__title">Global Content Map</h2>
+                </div>
+                <div class="chart-container" id="chart-map"></div>
+            </div>
+
+            <div class="chart-card" id="card-treemap">
+                <div class="chart-card__header">
+                    <h2 class="chart-card__title">Genre Landscape</h2>
+                </div>
+                <div class="chart-container" id="chart-treemap"></div>
+            </div>
+
+            <!-- Row 3: Ratings + Duration -->
+            <div class="chart-card" id="card-ratings">
+                <div class="chart-card__header">
+                    <h2 class="chart-card__title">Content Ratings</h2>
+                </div>
+                <div class="chart-container" id="chart-ratings"></div>
+            </div>
+
+            <div class="chart-card" id="card-duration">
+                <div class="chart-card__header">
+                    <h2 class="chart-card__title">Duration Distribution</h2>
+                </div>
+                <div class="chart-container" id="chart-duration"></div>
+            </div>
+
+            <!-- Row 4: Seasonality + Directors -->
+            <div class="chart-card" id="card-seasonality">
+                <div class="chart-card__header">
+                    <h2 class="chart-card__title">Seasonality (Added by Month)</h2>
+                </div>
+                <div class="chart-container" id="chart-seasonality"></div>
+            </div>
+
+            <div class="chart-card" id="card-directors">
+                <div class="chart-card__header">
+                    <h2 class="chart-card__title">Top 10 Directors</h2>
+                </div>
+                <div class="chart-container" id="chart-directors"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         SCRIPTS — D3.js from CDN, then local modules
+         ═══════════════════════════════════════════════════════════════ -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+
+    <!-- Core utilities (must load first) -->
+    <script src="js/utils.js?v=2"></script>
+    
+    <!-- Data loading and processing -->
+    <script src="js/data-loader.js?v=4"></script>
+    
+    <!-- Shared Tooltip -->
+    <script src="js/tooltip.js?v=1"></script>
+    
+    <!-- Chart Modules -->
+    <script src="js/sidebar-brush.js?v=1"></script>
+    <script src="js/timeline.js?v=1"></script>
+    <script src="js/genre-treemap.js?v=1"></script>
+    <script src="js/map.js?v=1"></script>
+    <script src="js/ratings.js?v=1"></script>
+    <script src="js/duration.js?v=1"></script>
+    <script src="js/seasonality.js?v=1"></script>
+    <script src="js/directors.js?v=1"></script>
+    
+    <!-- Main Application -->
+    <script src="js/app.js?v=6"></script>
+
+</body>
+</html>
